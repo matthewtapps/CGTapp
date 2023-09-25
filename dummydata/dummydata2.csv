@@ -1,0 +1,4 @@
+type,assetID,transactionType,date,quantity,value,optionID,optionSplitID
+Share,TSLA,Buy,28/01/2020,100,19340.2,,
+Share,TSLA,Split,31/08/2020,5,0,,
+Share,TSLA,Sell,25/06/2021,300,218171,,
