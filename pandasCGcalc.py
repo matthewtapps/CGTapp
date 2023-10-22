@@ -17,6 +17,7 @@ class TransactionType(Enum):
     Expire = 7
     LIFO_Sale = 8
     HighestGain_Sale = 9
+    LowestGain_Sale = 10
 
     def __lt__(self, other):
         custom_order = {
@@ -28,7 +29,8 @@ class TransactionType(Enum):
             TransactionType.Exercise: 6,
             TransactionType.Expire: 7,
             TransactionType.LIFO_Sale: 8,
-            TransactionType.HighestGain_Sale: 9
+            TransactionType.HighestGain_Sale: 9,
+            TransactionType.LowestGain_Sale: 10,
         }
         return custom_order[self] < custom_order[other]
 
@@ -114,6 +116,8 @@ class TransactionHistory():
             return pd.Series([TransactionType.Expire])
         elif type == 'highest_gain_sale':
             return pd.Series([TransactionType.HighestGain_Sale])
+        elif type == 'lowest_gain_sale':
+            return pd.Series([TransactionType.LowestGain_Sale])
         else:
            raise Exception('Transaction type decoding error, check transaction types are spelled correctly in the input file')
     
@@ -183,6 +187,12 @@ class Portfolio:
                 new_row = pd.DataFrame(self.expire(transaction['AssetType'], transaction['AssetID'], transaction['Date'], transaction['Value'] / transaction['Quantity'], transaction['Quantity'], transaction['OptionID']))
                 self.taxableTransactions = pd.concat(
                     [self.taxableTransactions, new_row], ignore_index = True)
+                
+            elif transactionType == TransactionType.HighestGain_Sale:
+                self.highestGainSale(transaction['AssetType'], transaction['AssetID'], transaction['Date'], transaction['Value'], transaction['Quantity'])
+
+            elif transactionType == TransactionType.LowestGain_Sale:
+                self.lowestGainSale(transaction['AssetType'], transaction['AssetID'], transaction['Date'], transaction['Value'], transaction['Quantity'])
 
             #else: raise Exception(f"{transaction['Date']} Transaction type error, please check transaction type")
 
@@ -370,6 +380,36 @@ class Portfolio:
     def highestGainSale(self, assetType: AssetType, assetIdentifier: str, date: dt.date, value: float, quantity: float):
         assert assetType == AssetType.Share, "Highest gain sale transaction type called on option, options can only be sold specifically by ID - please check transaction types for validity"
         saleShares = self.assets[(self.assets['AssetType'] == assetType) & (self.assets['AssetIdentifier'] == assetIdentifier)].sort_values(['Value']).head(int(quantity))
+        groups = saleShares.groupby('PurchaseDate')
+        transactions = []
+        for purchaseDate, group in groups:
+            groupQuantity = len(group)
+            groupCostBase = group['Value'].sum()
+            groupProceeds = (value / quantity) * groupQuantity
+            groupGrossValue = groupProceeds - groupCostBase
+            acquisitionDate = group['PurchaseDate'].max()
+            discountable = False
+            if (date - relativedelta(years=1) > acquisitionDate) & (groupGrossValue > 0) : discountable = True
+            if groupGrossValue < 0: discountable = 'Loss'
+            transactions.append({
+                'Date': date, 
+                'AssetID': assetIdentifier, 
+                'AssetType': assetType,
+                'TransactionType': TransactionType.FIFO_Sale, 
+                'Quantity': groupQuantity, 
+                'AcquisitionDate': acquisitionDate, 
+                'Proceeds': groupProceeds, 
+                'CostBase': groupCostBase, 
+                'GrossValue': groupGrossValue, 
+                'Discountable': discountable
+            })
+        self.assets.drop(saleShares.index, inplace=True)
+        self.assets.reset_index(drop=True, inplace=True)
+        return transactions
+
+    def lowestGainSale(self, assetType: AssetType, assetIdentifier: str, date: dt.date, value: float, quantity: float):
+        assert assetType == AssetType.Share, "Lowest gain sale transaction type called on option, options can only be sold specifically by ID - please check transaction types for validity"
+        saleShares = self.assets[(self.assets['AssetType'] == assetType) & (self.assets['AssetIdentifier'] == assetIdentifier)].sort_values(by=['Value'],ascending=False).head(int(quantity))
         groups = saleShares.groupby('PurchaseDate')
         transactions = []
         for purchaseDate, group in groups:

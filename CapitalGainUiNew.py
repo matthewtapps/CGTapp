@@ -36,7 +36,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment
 
 sys.argv += ['-platform', 'windows:darkmode=2']
-expiredate = dt.date(2023, 8, 31)
+expiredate = dt.date(2023, 12, 31)
 
 class TransactionModel(QStandardItemModel):
     def data(self, index, role=Qt.DisplayRole): # type: ignore
@@ -291,7 +291,7 @@ class MainWindow(QMainWindow):
         #Defining field edit items
         #0: Date, 1: AssetType, 2: AssetID, 3: TransactionType, 4: Quantity, 5: Value, 6: OptionID, 7: OptionSplitID, 8: GrossGain, 9: Discountable
         assetTypeList = ['Share', 'Option']
-        transactionTypeList = ['Purchase', 'FIFO_Sale', 'LIFO_Sale', 'Split', 'Merge', 'Option_Sale', 'Exercise', 'Expire', 'Highest_Gain_Sale']
+        transactionTypeList = ['Purchase', 'FIFO_Sale', 'LIFO_Sale', 'Split', 'Merge', 'Option_Sale', 'Exercise', 'Expire', 'Highest_Gain_Sale', 'Lowest_Gain_Sale']
         assetTypeComboBox = ComboBoxDelegate(self.transactionHistoryView, assetTypeList)
         transactionTypeComboBox = ComboBoxDelegate(self.transactionHistoryView, transactionTypeList)
         dateDelegate = CalendarDelegate(self.transactionHistoryView)

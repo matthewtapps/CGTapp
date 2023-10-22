@@ -455,13 +455,13 @@ class PortfolioTestCase(unittest.TestCase):
         self.standardSharePurchase(value = 5000.00, quantity = 10.00, purchaseDate = dt.date(2022, 4, 30)) # Purchase later than first purchase
         purchaseDate = dt.date(2022, 4, 30) # expected purchaseDate from second standardPurchase
         
-        # Begin lifoSale test case:
+        # Begin highestgain_sale test case:
         assetType = AssetType.Share
         assetIdentifier = 'TEST'
         saleDate = dt.date(2023, 4, 1)
         value = 10000.00
         quantity = 5.00 # five shares sold from first parcel of shares
-        testValues = self.portfolio.lifoSale(
+        testValues = self.portfolio.highestGainSale(
             assetType,
             assetIdentifier,
             saleDate,
@@ -486,6 +486,48 @@ class PortfolioTestCase(unittest.TestCase):
         assert testParcels[1][0] == 5.00, "highestgain_sale() failed test: remaining shares in second parcel does not match expected value"
         assert testParcels[0][1] == 10000.00, "highestgain_sale() failed test: cost base of shares in first parcel does not match expected value"
         assert testParcels[1][1] == 2500.00, "highestgain_sale() failed test: cost base of shares in second parcel does not match expected value"
+
+    def test_lowestgain_sale(self):
+        """
+        lowestgain_sale test that has two purchases with different cost bases
+        Lowest cost base is purchased first to confirm sorting is working correctly
+        """
+        self.standardSharePurchase(value = 10000.00, quantity = 10.00, purchaseDate = dt.date(2022, 3, 30))
+        self.standardSharePurchase(value = 5000.00, quantity = 10.00, purchaseDate = dt.date(2022, 4, 30)) # Purchase later than first purchase
+        purchaseDate = dt.date(2022, 3, 30) # expected purchaseDate from first standardPurchase
+        
+        # Begin lowestgain_sale test case:
+        assetType = AssetType.Share
+        assetIdentifier = 'TEST'
+        saleDate = dt.date(2023, 4, 1)
+        value = 10000.00
+        quantity = 5.00 # five shares sold from second parcel of shares
+        testValues = self.portfolio.lowestGainSale(
+            assetType,
+            assetIdentifier,
+            saleDate,
+            value,
+            quantity
+        )
+        assert len(self.portfolio.assets) == 15, "lowestgain_sale() failed test: quantity does not match expected value"
+        print (self.portfolio.assets['Value'].sum())
+        assert self.portfolio.assets['Value'].sum() == 10000.00, "lowestgain_sale() failed test: remaining portfolio value does not match expected value"
+        assert testValues[0]['CostBase'] == 5000.00, "lowestgain_sale() failed test: cost base of transaction output does not match expected value"
+        assert testValues[0]['Date'] == saleDate, "lowestgain_sale() failed test: date of transaction output does not match expected value"
+        assert testValues[0]['Quantity'] == 5.00, "lowestgain_sale() failed test: quantity of transaction output does not match expected value"
+        assert testValues[0]['AcquisitionDate'] == purchaseDate, "lowestgain_sale() failed test: acquisition date of transaction output does not match expected value"
+        assert testValues[0]['Proceeds'] == 10000.00, "lowestgain_sale() failed test: proceeds of transaction output does not match expected value"
+        assert testValues[0]['GrossValue'] == 5000.00, "lowestgain_sale() failed test: gross value of transaction output does not match expected value"
+        assert testValues[0]['Discountable'] == True, "lowestgain_sale() failed test: discountable (bool) of transaction output does not match expected value"
+        dateGroups = self.portfolio.assets.groupby('Value')
+        assert len(dateGroups) == 2, "lowestgain_sale() failed test 2: number of values present in portfolio does not match expected value"
+        testParcels = []
+        for purchaseDate, group in self.portfolio.assets.groupby('PurchaseDate'):
+            testParcels.append((len(group), group['Value'].sum()))
+        assert testParcels[0][0] == 5.00, "lowestgain_sale() failed test: remaining shares in first parcel does not match expected value"
+        assert testParcels[1][0] == 10.00, "lowestgain_sale() failed test: remaining shares in second parcel does not match expected value"
+        assert testParcels[0][1] == 5000.00, "lowestgain_sale() failed test: cost base of shares in first parcel does not match expected value"
+        assert testParcels[1][1] == 5000.00, "lowestgain_sale() failed test: cost base of shares in second parcel does not match expected value"
 
 if __name__ == '__main__':
     unittest.main()
