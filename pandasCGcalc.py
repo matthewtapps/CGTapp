@@ -62,9 +62,11 @@ class TransactionHistory():
         self.transactions['Date'] = self.transactions['Date'].map(self.decodeDate)
         if type(self.transactions['Quantity'][0]) == str:
             self.transactions['Quantity'] = self.transactions['Quantity'].str.replace(',', '', regex=True).astype('float')
-            self.transactions['Value'] = self.transactions['Value'].str.replace(',', '', regex=True).astype('float')
         else:
             self.transactions['Quantity'] = self.transactions['Quantity'].astype('float')
+        if type(self.transactions['Value'][0]) == str:
+            self.transactions['Value'] = self.transactions['Value'].str.replace(',', '', regex=True).astype('float')
+        else:
             self.transactions['Value'] = self.transactions['Value'].astype('float')
         self.transactions.fillna('', inplace = True)
         self.transactions = self.sortByDate(self.transactions)
@@ -365,7 +367,7 @@ class Portfolio:
                 'Date': date, 
                 'AssetID': assetIdentifier, 
                 'AssetType': assetType,
-                'TransactionType': TransactionType.FIFO_Sale, 
+                'TransactionType': TransactionType.LIFO_Sale, 
                 'Quantity': groupQuantity, 
                 'AcquisitionDate': acquisitionDate, 
                 'Proceeds': groupProceeds, 
@@ -395,7 +397,7 @@ class Portfolio:
                 'Date': date, 
                 'AssetID': assetIdentifier, 
                 'AssetType': assetType,
-                'TransactionType': TransactionType.FIFO_Sale, 
+                'TransactionType': TransactionType.HighestGain_Sale, 
                 'Quantity': groupQuantity, 
                 'AcquisitionDate': acquisitionDate, 
                 'Proceeds': groupProceeds, 
@@ -409,7 +411,14 @@ class Portfolio:
 
     def lowestGainSale(self, assetType: AssetType, assetIdentifier: str, date: dt.date, value: float, quantity: float):
         assert assetType == AssetType.Share, "Lowest gain sale transaction type called on option, options can only be sold specifically by ID - please check transaction types for validity"
-        saleShares = self.assets[(self.assets['AssetType'] == assetType) & (self.assets['AssetIdentifier'] == assetIdentifier)].sort_values(by=['Value'],ascending=False).head(int(quantity))
+        calcPortfolio = self.assets[(self.assets['AssetType'] == assetType) & (self.assets['AssetIdentifier'] == assetIdentifier)]
+        proceedsPerShare = value / quantity
+        calcPortfolio['NetGain'] = proceedsPerShare - calcPortfolio['Value']
+        calcPortfolio['NetGain'] = calcPortfolio.apply(
+            lambda row: row['NetGain'] / 2 if (date - row['PurchaseDate']).days > 365 else row['NetGain'],
+            axis=1
+        )
+        saleShares = calcPortfolio.sort_values(by=['NetGain']).head(int(quantity))
         groups = saleShares.groupby('PurchaseDate')
         transactions = []
         for purchaseDate, group in groups:
@@ -425,7 +434,7 @@ class Portfolio:
                 'Date': date, 
                 'AssetID': assetIdentifier, 
                 'AssetType': assetType,
-                'TransactionType': TransactionType.FIFO_Sale, 
+                'TransactionType': TransactionType.LowestGain_Sale, 
                 'Quantity': groupQuantity, 
                 'AcquisitionDate': acquisitionDate, 
                 'Proceeds': groupProceeds, 
